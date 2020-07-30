@@ -1,0 +1,9 @@
+Flocking birds simulation
+
+Birds are independent and autonomous: use sensor to detect nearby birds
+
+Demonstrates emergent behaviour from simple rules
+
+Two- and three-dimensional simulation, settings adjust behaviour in real time
+
+Requires land (impact 1 per simulated bird)

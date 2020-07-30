@@ -1,0 +1,51 @@
+
+Edit original file:
+    blender corgi_low_poly.blend
+
+Delete corgi on the right:
+    b, select with mouse, edit/delete
+this deletes the background as well.
+
+View/View all layers
+    this shows the second model with the base.
+
+Select right side of base with b+mouse, Edit/delete to delete.
+
+Now we have just the corgi.
+
+Save as: corgi1.blend
+
+Colouring of the model is done wiht materials: go to Properties/
+Materials (sphere icon) to see definitions.
+
+Deleted armature, camera, and light.
+
+Save as corgi2.blend.
+
+Exported as DAE, re-imported, exported again.  Same problem.
+
+After an hour flailing around, I figured out that the problem was
+that the normals for the sections which were being imported as
+transparent were backward.  To fix this in Blender:
+    Click in the 3D window, then tab until at the left Shading/UVs
+        appears as a tab, select the tab.
+    Right mouse select the entire mesh.
+    Click Normals/Recalculate.
+Save the updated file.  You should now be able to import the
+DAE and everything will be visible and your materials applied.
+
+Saved this version as xorgi5.blend.
+
+Resaved xorgi6.blend, exported xorgi6.dae.
+
+Mesh upload parameters:
+    Scale: 0.14, size 0.386 x 0.647 x 0.544  No textures
+    Physics model: Lowest
+    Level of Detail
+        Highest:    From file   Tri: 768                768
+        Medium:     Generate    Tri limit: 360          193      
+        Low:        Generate    Tri limit: 360          193
+        Lowest:     Generate    Tri limit:  24           25
+        Normals: on, Crease angle: 75
+        Upload fee: L$21  Land impact 1.220
+    

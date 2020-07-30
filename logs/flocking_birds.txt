@@ -1,0 +1,975 @@
+
+                    Fourmilab Flocking Birds
+
+                         Development Log
+
+2020 July 1
+
+Now, with initial development and debugging apparently complete, it's
+time to start tuning the default behavioural parameters so it provides
+interesting behviour right out of the box.
+
+This works well in action 1 and never triggers the speed limit of 2.
+  avoidFactor 1
+  centeringFactor 0.01
+  edgeMargin 0.2 m
+  matchingFactor 1
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 0.05 m
+    actions 3
+
+Enabled centre of mass (action 4).  Set:
+  avoidFactor 1
+  centeringFactor 0.5   **
+  edgeMargin 0.2 m
+  matchingFactor 1
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1 m       **
+    actions 7           **
+This has a weak attractor value.  Setting centeringFactor to 1 causes
+birds to strongly orbit each other in separate areas.
+
+Now let's try enabling collision avoidance (8) with centre of mass off
+(hence action 11).  With avoid factor the repulsion is almost immediate
+when they approach within visual range.  Let's try bringing it down. A
+setting of 0.25 produces a subtle effect which is strong enough to kick
+a bird which has become stuck with near-zero velocity.
+  avoidFactor 0.25      **
+  centeringFactor 1
+  edgeMargin 0.2 m
+  matchingFactor 1
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1 m
+    actions 11          **
+
+Finally, there's match velocities.  Try it alone, with only edge
+avoidance and speed limit enabled (action 19).  A match factor of 0.1
+is already very powerful.  It causes grouping into slow-moving clusters
+due to averaging out velocities.
+
+Bug: a bird with a velocity of <0,0,0> will point nose down due to a
+singularity in computing its bearing.  Fixed: don't set orientation in
+updateVelocity() if the magnitude of the velocity vector is less than
+0.01.
+
+  avoidFactor 0.25
+  centeringFactor 1
+  edgeMargin 0.2 m
+  matchingFactor 0.1    **
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1 m
+    actions 19          **
+
+Enabling avoidance (action 27) breaks up stalls due to matching
+velocity.
+
+Now let's try all-up operation.
+  avoidFactor 0.25
+  centeringFactor 1
+  edgeMargin 0.2 m
+  matchingFactor 0.1
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1 m
+    actions 31
+
+This is better than anything we've seen so far.  It's not perfect, but
+it's progress in the right direction.
+  avoidFactor 0.25
+  centeringFactor 1
+  edgeMargin 0.2 m
+  matchingFactor 0.1
+  minDistance 1 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1 m
+    actions 31
+
+De mieux en mieux:
+  avoidFactor 0.2
+  centeringFactor 1
+  edgeMargin 0.2 m
+  matchingFactor 0.1
+  minDistance 0.5 m
+  speedLimit 2 m/s
+  timerUpdate 0.1 s
+  turnFactor 0.1 m/s
+  visualRange 1.5 m
+    actions 31
+
+Principles for the theory section of the User Guide:
+
+Physics is local.
+Rules are simple.
+Order is emergent.
+There is no hierarchy.
+
+If your rule has more than two lines
+of code, you're doing something wrong.
+
+Birds with initial velocity of ZERO_VECTOR don't respond to recruitment
+by others.  Fixed to make sure that can't happen in the deployer.
+
+Chirp based upon acceleration in a given frame.
+    https://www.soundeffectsplus.com/product/birds-chirping-01/
+    https://www.soundeffectsplus.com/product/birds-chirping-02/
+    https://www.soundeffectsplus.com/product/birds-chirping-03/
+    https://www.soundeffectsplus.com/product/bird-singing-01/
+
+Enable and test 3D.
+
+2020 July 2
+
+Added a lifeTime setting which sets the number of seconds birds live
+after being hatched.  This allows demonstrations which automatically
+clean up all of the bird after a specified interval without the need to
+use the Remove command.  If lifeTime is set to zero, the birds are
+immortal unless Removed.
+
+Added logic in hatchBird() that sets the rotation of birds when rezzed
+based upon their initial velocity.  This avoids the unnatural alignment
+and then jarring re-orientation when they start to fly.
+
+Implemented a new strategy to work around the lost region message
+problem which caused birds not to start when more than 64 were hatched
+at a time.  The REZ messages were coming back from the birds before
+hatchBird() was done, and when the queue of pending messages exceeded
+64, additional messages were lost, resulting in "stuck birds".  To
+prevent this, I changed hatchBird() to simply add the birds to
+birdParams and then, when it's all done, start a timer which on each
+tick starts the next bird.  This spaces out the bird's REZ replies and
+gives the script time to process the messages as they arrive.  I
+currently have the timer set at 0.25 seconds and it seems to work on
+Fourmilab Island.  I will have to try it on a slow sandbox and see how
+it behaves.  If this doesn't work, I'll have to trigger communicating
+with birds one at a time, waiting for a REZ message before moving on to
+the next.
+
+When generating random positions for birds, we were checking that they
+ere in the same region, but that isn't good enough: we need to verify
+that the owner is allowed to rez in that location.  I added logic in
+hatchBird() that retrieves the parcel ID and owner for the deployer's
+parcel and the candidate bird position. The candidate point is used
+only if it is within the same parcel or is in a parcel with the same
+owner as that in which the deployer is sitting.  If a candidate fails
+these tests, we'll try up to 10 times to generate a valid candidate
+before giving up and abandoning the hatch command.
+
+Implemented a Hide on/off command to hide the deployer.  The deployer
+is always un-hidden when the script is reset.
+
+Implemented sitting on birds.  Birds are now marked as "Touch to sit",
+and when when rezzed, they define a sit position on top of the bird and
+camera looking over the avatar's head in the direction of travel.  I
+may adjust the camera location based upon further experimentation, but
+it's basically working now and great fun to try.  It's amazing the
+payload an African swallow can carry!
+
+Added the ability to specify a list of birds to be queried by the List
+command.  If no bird numbers are specified, all birds in the region are
+listed as before.
+
+2020 July 3
+
+Implemented a Set paths on/off facility which causes birds to emit a
+particle trail showing their recent (3 second) paths. The particle
+trails are, as always, a bit dodgy and dependent upon viewer
+performance, but when it's running well the effect can be quite pretty.
+The colour of the path is the colour of the bird's top (bird number
+modulo 10).
+
+Tested deployment of large numbers of birds in two notoriously slow and
+laggy sandbox sims to see if yesterday's fixes have resolved the "stuck
+bird" problems.  They appear to have done so.
+
+Redesigned the hatch process to reduce the number of items in the
+birdParams list from 7 per bird to three, which dramatically reduces
+the memory requirement and allows many more birds before running into
+the script memory limit.  With the revised code, creating 200 birds
+still leaves script memory usage (just) below 80%.
+
+Fixed setting the bottom colour of birds so it doesn't break if there
+are more than 99 birds.
+
+Redesigned the Init command, which was completely broken before and
+further risked lost messages due to sending region messages
+independently to each bird.  Not, it broadcasts a single RESET message
+to which each bird responds independently by restoring its initial
+position and velocity, which it saves when hatched. This is all done
+with physics enabled, using llMoveToTarget(), getting rid of the flaky
+switching back and forth from physics mode.  Further, since the birds
+remember their own initial position and velocity, there is no need to
+remember them in the birdParams list in the deployer, so with a little
+more fiddling on that side we can dispose of the list once a hatch
+session is complete, eliminating script memory limits on the total
+number of birds created (although a limit will remain on how many can
+be created in a single hatch command).
+
+Extended the arg() function so that n argument of "-" may be used to
+specify the default for that argument.
+
+Added defaults to the usage message if the Hatch command is entered
+with no arguments.
+
+Enabled three-dimensional position and initial velocities.  It works!
+Made 2D/3D selection controllable with "Set flatland on/off".  You can
+change this as a setting while running.  If you turn off flatland after
+starting in that mode, removal of the Z belocity contraint will result
+in a rapid evolution to full 3D behaviour due to dispersion resulting
+from truncation/round-off in single precision arithmetic.  Turning on
+flatland after 3D operation results in an interesting dynamic where you
+see flocking at different altitudes where the birds can see one
+another, but no interaction among cohorts at altitudes which are out of
+visual range.
+
+Added "chirp" sound effects.  When a bird calls updateVelocity() to
+adjust its velocity, the fuction computes the angle between the desired
+velocity vector and the current forward direction of the bird.  If this
+exceeds the angle specified by the "chirp" setting, it emits a chirp
+(unless one is already playing, determined from the time and the
+chirpLength parameter) with volume given by setting volume.  The chirp
+is a sound clip with duration 570 milliseconds extracted from:
+    https://www.soundeffectsplus.com/product/birds-chirping-01/
+and named "Chirp" in the bird's inventory.
+
+The turn angle which triggers a chirp is set by "Set chirp n", where
+the angle is specified in degrees and defaults to 60 and the volume is
+controlled by "Set volume n" where n is between 0 and 1.  Setting
+either chirp or volume to zero disables chirps.
+
+Set flatland to OFF by default; we're 3D all the way!
+
+Set turnFactor to 2 m/s by default.  This better constrains us to the
+specified radius of hatching.
+
+2020 July 4
+
+Added logic to the listen() handler in Bird to only respond to commands
+sent by the deployer that rezzed the bird.  This allows multiple
+deployers to command flocks independently and avoids the embarrassment
+of a user in another parcel deleting all of the birds in a region with
+the "Remove" command.
+
+After further experimentation, I revised turnFactor to 1.5.
+
+Added a eOnOff() function to edit a Boolean parameter to "on" or "off"
+and revised the Status command to use it.  The order in which the
+Status command displays settings now agrees with the order in which
+they appear in the Flocking Birds script.
+
+Revised the code in avoidEdges() to test against pre-computed
+cageEdgeLow and cageEdgeHigh vectors which are set when SETTINGS are
+received based upon edgeMargin.  This eliminates lots of repetitive
+arithmetic in the tests for approaching edges and makes the code easier
+to understand.
+
+Changed the Bumpiness of the eggshell to the standard "stucco" pattern,
+which looks more natural and less plastic-y than no bumpiness.
+
+Added a "Set model" command to specify the name of the model to be used
+for birds.  The model must be in the deployer's inventory and may be
+specified in upper and lower case with embedded spaces.  Entering just
+"Set model" lists available models.
+
+Modified the Bird script to use the first sound clip in the inventory
+as the chirp sound rather than hard-coding "Chirp".  This allows
+simpler management of different sound clips when multiple models are
+supported.
+
+Created a Universal Flying Object (UFO) containing the Bird script
+which can be used as the root prim for any other object, oriented
+appropriately (+Z forward, +X down) in order to fly under control of
+the Bird script.  Just take your object, orient appropriately, and then
+link it into a composite with UFO as the root prim.  Make the root prim
+transparent to hide it, take into inventory, install into the inventory
+of the deployer, select with Set model, and you're flying!
+
+Added a "Hide hatch" option to hide the deployer during a hatch
+operation, to avoid the distracting jumping around of the deployer to
+each location.  The deployer disappears at the start of the hatching
+and reappears when it's done.
+
+2020 July 5
+
+Revised the Bird script to make it easier to use the Universal Flying
+Object.  When rezzed by the deployer, if the script finds itself in
+the root prim of a link set and has a prim description (not name: you
+can use any name you wish) of "Universal Flying Object"), then its
+colour is set to transparent to hide it and no colour is applied to
+the model based upon bird number.  This eliminates the need for the
+user to edit the link and manually set it transparent after linking
+their model to it.  I added textures to the Universal Flying Object
+to show a bird in the alignment in which it will fly, with the top
+black and the bottom white (a common colour pattern for birds) as an
+aid in aligning models with the UFO prim.
+
+Added logic to on_rez() in Bird to randomly choose one if more than one
+sound clip is present in the inventory.  This allows birds to have
+diverse chirps.  A given bird will always use the same chirp.
+
+Created a Marketplace entry and first draft of the product page,
+including screen shot images.
+
+2020 July 6
+
+Prepared, edited, and annotated a demo video with size 1248x832.
+Uploaded to YouTube as:
+    https://www.youtube.com/watch?v=SZkUB-TeT-U
+Added the YouTube link to the Marketplace page, and added the thumbnail
+prepared for the video as an alternative image in the Marketplace.
+
+Revised how birdParams[] is handled when hatching birds.  Previously,
+it kept track of the creation parameters for all birds.  With the
+change to how the Init command works on 2020-07-03, there is no need
+for the deployer to retain this information, which limits the number of
+birds it can deploy due to script memory constraints.  We now only use
+birdParams[] while actually hatching birds.  It is cleared at the start
+of each Hatch command, and a separate index used to keep track of the
+global number of birds created (until reset by a Remove command). This
+means what while the number of birds which can be hatched by a single
+Hatch command is limited (it's presently comfortably well above 250),
+the only limit on the total number of birds which may be created by
+multiple commands is that imposed by the parcel's land impact capacity.
+
+Hatched 1500 birds in a public sandbox with repeated:
+    hatch 250 75 20
+and nothing went wrong.  It did't kill the sandbox, the frame rate
+never went down below 13, and the simulation ran smoothly.  Riding
+on a bird worked with no problems.  The larger volume limited the
+scope of flocking.
+
+2020 July 7
+
+Created several models to demonstrate custom objects using the
+Universal Flying Object.  The first is our classic anvil from the Anvil
+Tosser and Rocket projects, which is scaled to bird size and equipped
+with a clang sound derived from:
+    https://soundeffects.fandom.com/wiki/Sound_Ideas,_HIT,_METAL_-_ANVIL_FALL_ON_HEAD,_CARTOON_01
+
+Next is a low-polygon hawk model based upon a Blender model from:
+    https://www.blendswap.com/blend/9761
+and licensed under CC-BY 3.0.  I exported the model as a .dae file,
+created a medium level of detail model using the Decimate filter in
+Blender and exported that, and then imported into Second Life,
+twiddling the parameters to achieve a land impact of just 2, even when
+linked to the UFO.  The sound effect is derived from:
+    https://soundeffects.fandom.com/wiki/Hollywoodedge,_Bird_Hawk_Single_Scre_PE020801
+
+Finally, I made a Star Wars Tie Fighter based upon the Blender model:
+    https://www.blendswap.com/blend/18585
+which is also licensed under CC-BY 3.0.  This low-polygon model comes
+in with a land impact of just 1, even attached to the UFO.  The sound
+effect is chosen from sounds derived from:
+    https://www.soundboard.com/sb/sound/963768
+    http://soundfxcenter.com/movies/star-wars/8d82b5_Tie_Fighter_Flyby_Sound_Effect.mp3
+
+2020 July 8
+
+Added the ability to specify the length of an audio clip in the Bird's
+inventory by giving it a name like:
+    My Clip, time 2.17
+where the number after the time is the duration in seconds.  If no time
+is specified, the default of 0.6 seconds will be used.  I'd have
+preferred specifying this in the description, but you can't see the
+description of an inventory item before it's instantiated.
+
+Added a gimmick whereby if the name of a sound clip in the inventory
+contains an exclamation point, it will not be considered a candidate
+for the bird's turning sound.  This allows including sound clips for
+other scripts which the main Bird script will ignore.
+
+2020 July 9
+
+Revised the way the birdParams list is handled while hatching birds and
+improved messages issued during the hatching process.  The "Deployed
+bird(s)" message replaced by "Hatching bird(s)" when the deployment
+begins, and a new "Hatching complete." message is issued when all birds
+have been deployed.  The parameters for a bird are now deleted from
+birdParams when we receive the REZ message that indicates it is up and
+running.
+
+Extended the Flying Tie Fighter into a new model named "Attack Drone".
+This is the Tie Fighter plus a green laser beam extending along its
+direction of flight.  A separate script named "Laser Cannon" performs a
+ray cast from its timer and if the beam intercepts an avatar (the
+script can be configured not to shoot at its owner by setting the
+variable noShootOwner TRUE), it makes the normally hidden beam visible
+for a few timer ticks and plays a "Pew!" sound clip.  It rezzes an
+invisible object from the inventory called "Explosion" at the location
+of the ray cast avatar intersection, which proceeds to start a particle
+system explosion and play a bang sound.  The Explosion object is
+temporary and deletes itself in two seconds in any case.  If permitted
+by the parcel, the avatar hit is given a push away from the point of
+impact along the vector of the beam with a force of pushImpulse.
+Setting pushImpulse turns off pushing.
+
+The Attack Drone modifies the flocking behaviour by performing a
+periodic sensor scan for avatars in its detection radius, which is set
+in visualRange to 7 metres.  (Note that this is completely independent
+of the visualRange setting in the Bird script.)  It selects the closest
+avatar, then sends a LM_BI_TARGET (11) link message to the Bird script
+providing the distance, position, and UUID of the identified target.
+The bird script uses this to cause movement toward the target in the
+same manner as it moves toward the centre of mass of nearby birds with
+a strength given by targetFactor which defaults to 0.2.  The target
+seeking behaviour is controlled by the 32 bit in the actions setting
+and is on by default (but it won't do anything if the Bird script
+doesn't receive target messages from another script.  If no target is
+identified, a LM_BI_TARGET message is sent with a position of <-1, -1,
+-1> to revoke the earlier target designation.  Scanning for targets is
+suppressed for fireRechargeTime (default 5 seconds) after firing the
+cannon and the earlier target is cancelled, encouraging the drone to
+seek other targets.
+
+Optimised the llListen functionality in the Bird and Laser Cannon
+scripts by specifying the key of the deployer.  We will only receive
+messages sent by the deployer who hatched us.
+
+2020 July 10
+
+Added a general means for the deployer to communicate settings to
+auxiliary scripts (such as the Laser Cannon) which are running within
+birds.  A new "Auxiliary ..." command transmits a region message on
+birdChannel with a JSON-encoded list which consists of:
+    "AUX"
+    bird_number     (0 for all birds broadcast: presently always sent)
+    user_key        Key of avatar who entered command
+    message         Original message, upper/lower case, untrimmed
+    argn            Number of parsed arguments
+    args...         Parsed arguments from command
+The handling of this message is entirely up to a script which receives
+it.
+
+Added Auxiliary messages for the laser cannon.  Arguments are shown
+with defaults for their initial settings.
+    Auxiliary cannon explode on             Explode at laser hit?
+    Auxiliary cannon ownerProtect on        Don't shoot owner?
+    Auxiliary cannon push n                 Push avatars hit with impulse n
+    Auxiliary cannon range n                Cannon firing range n metres
+    Auxiliary cannon trace off              Enable/disable trace
+    Auxiliary cannon volume n               Fire sound volume
+
+Redesigned the hatching process for the second time in two days. This
+revision totally elmininates the need to keep a list of all of the
+birds to be hatched in birdParams before hatching starts, which imposed
+a script memory limitation on the number which could be hatched by a
+single Hatch command.  Now, the Hatch command simply saves the
+arguments to be used in creating the birds, sets variables indicating
+the range of numbers to be hatched, and starts the timer to trigger
+hatching.  The timer() event now generates the initial position and
+velocity for each bird, saves it in birdParams, and rezzes the bird.
+When the bird reports back that its script is running via the "REZ"
+message, the listen() handler looks up the parameters to send it from
+birdParams, sends the "INIT" message, and then immediately deletes the
+entry from birdParams, which is no longer required by the deployer.
+This means that in most cases the deployer will have no more than one
+entry in birdParams at a time, regardless of how many birds it's
+hatching.  Even if things get laggy and all asynchronous, there won't
+be more than a few entries in the list waiting for their birds to
+report in.
+
+2020 July 11
+
+Added the ability for a hit on an avatar to inflict damage on the
+avatar under the Linden Lab Combat System (LLCS) via llSetDamage().
+This is disabled by default, but may be enabled with the command:
+    Auxiliary cannon damage n
+where n is the amount of damage from 0 (none) to 100 (immediate kill).
+Because of the curious way damage is inflicted (only by an avatar's
+collision with a non-phantom (but not necessarily physical) prim in
+which llSetDamage() has been set nonzero, which collision causes the
+colliding prim to instantly llDie(), I added a new invisible object
+within the Attack Drone called "Damage Bullet" which, if damage is
+enabled, is rezzed near the avatar's centre of mass, then moved to the
+centre of mass with llMoveToTarget() to provoke the collision which
+damages the avatar and kills the damage bullet.  If, for some screwball
+reason, the damage bullet misses, it will delete itself after two
+seconds.
+
+Implemented the first round of Defender Drone support.  If the model's
+name is "Defender Drone", the flag defender in the Laser Cannon script
+is set TRUE.  This has the following effects:
+    1.  The laser cannon beam colour is changed to a slightly
+        desaturated red, <1, 0.25, 0.25>.
+    2.  The timer() does not cast rays looking for avatars in the
+        beam's path to shoot.
+    3.  Instead, the drone looks for hits on objects with names
+        of "Attack Drone" within the beam.  If it finds one or
+        more, it activates the beam  and plays the sound to shoot
+        the closest adversary.
+    4.  The attacked drone is sent a message on birdChannel directed
+        to it with llRegionSayTo() and a type of "HIT" which identifies
+        which bird hit it by both bird number and its UUID.
+Attack Drones follow much the same logic, except they don't look for
+shots at Defender Drones unless they found no avatar to shoot and they
+only shoot at objects named "Defender Drone".  The way this is
+implemented, the identical Laser Cannon script can be used in both
+Attack and Defender Drones, with the object name distinguishing their
+behaviour.
+
+A new script placed in all drones, Flight Termination, listens for
+"HIT" messages.  When it receives one, it plays an Earth-shattering
+kaboom sound clip (inherited from the Anvil Tosser target) and the same
+explosion particle system effect as used by the target.  After a decent
+interval to let the particle system run, it destroys the drone with
+llDie().
+
+2020 July 12
+
+Promoted the "Set auxiliary" command to a top-level "Auxiliary"
+command, since these commands may cause actions as well as changing
+settings.  I revised references to "Set auxiliary" earlier in this
+log to avoid confusion.
+
+In Laser Cannon, I replaced the timer() based code to revoke a target
+designation after a period of time with no sensor() detection of
+avatars with a no_sensor() event handler which does the same thing.
+Somehow, I had ever come across no_sensor() and thought that failure to
+detect anything simply never called sensor() but otherwise did not
+notify the script.  It seems to work fine.
+
+Added an extension to the handling of Auxiliary commands in Laser
+Cannon.  You can direct an Auxiliary command to just attack or defender
+drones by specifying "attack" or "defender" after "Auxiliary cannon"
+and before the main command.  If neither of these words is specified,
+both types respond to the command.  For example:
+    Auxiliary cannon defender explode off
+makes defenders invulnerable to laser hits but leaves attackers able to
+explode when hit.
+
+2020 July 13
+
+Completely redesigned the way the boundaries of the cage within which
+birds are deployed and (more or less) subsequently fly. We previously
+had two, completely independent mechanisms: finding a suitable deploy
+position in Flocking Birds and constraining the cage size in each
+individual bird.  This is silly.  It makes much more sense to
+definitively establish the cage boundaries in the deployer, send them
+to each bird, and then set the initial position of the birds within
+those boundaries and pass that to the bird.  This will make choice of
+initial position of birds 100% reliable instead of subject to bad luck
+as it is now, and drastically simplify logic which is now repeated for
+every bird.
+
+Consequently, before beginning deployment for a Hatch command, the
+deployer now calls setCageCorners(), passing its position and the
+radius and height specified on the command.  Tha function first
+computes the requested corners of the cage based upon the position,
+radius, and height.  Then, using a constant called EDGE_AVOID_MARGIN,
+currently set to 2 metres, it verifies that the corners are no closer
+than that to an edge of the current region and, if so (or if they're
+outside the current region), they are constrained to the edge margin
+from the region edge.  Next, we get the key of the parcel in which
+the deployer is placed and for each cardinal point, verify that the
+extent implied the cage corners does not fall outside the current
+parcel.  If it does, that dimension of the corner is "walked back"
+toward the deployer in steps of EDGE_AVOID_MARGIN until a point within
+the parcel is found.  This is handled by a function called
+seekSuitableParcel() which adjusts cageCornerLow and cageCornerHigh
+as required to be within the current parcel.
+
+We could try to be more clever about permissions and, for example,
+permit the cage to extend into adjacent parcels with the same owner
+as that containing the deployer, but that would run the risk of
+falling on its face in the case, for example, of adjacent parcels
+with a concave perimeter (as simple as an "L" shaped set of three
+parcels).
+
+Once the constrained cage corners have been determined, the deployer
+saves them and, when each hatched bird reports in with its REZ message,
+sends the cage corners to the bird as part of the INIT message.  The
+Bird script, then, simply stores the corners and uses them to compute
+its edges at which the birds turn, cageEdgeLow and cageEdgeHigh, from
+them and the edgeMargin setting, eliminating all of the fiddling
+around it used to do computing and (poorly) trying to constrain the
+edges on its own.  This makes sense: real birds don't define the
+boundaries of their cages--that's up to whoever put them in there.
+
+Some experimentation will be required to determine the best settings
+for the various parameters to keep birds from flying outisde parcel
+boundaries when hatched on small parcels.  At the moment, preliminary
+testing at the houseboat indicates the present settings along with a
+turnFactor of 2 does a good job.
+
+Added instrumentation to the Bird script, conditionally compiled on
+CAGE_CHECK, which at every timer() tick whether the bird's position
+is outside the cageCornerLow/High bounds and reports violations.
+Preliminary testing with the Flying Anvil model showed that leaving
+turnFactor at 1.5 almost completely eliminated violations with a
+radius of 10 metres.  With 5 metres radius, violations were still
+rare with 100 anvils.
+
+Ran a longer test with dozens of anvils at the houseboat, replying on
+automatic sensing of parcel boundaries and computation of cage edges,
+and although we got a few small edge violations, we experienced no
+attempts to leave the parcel, due to the extra margin added by the
+parcel boundary restriction to keep that from happening.
+
+If hatchBird was unable to find a location to place a bird, the the
+message issued when the hatch process was abandoned in the timer()
+event of Flocking Birds displayed an incorrect number for the bird that
+failed: fixed.
+
+Fixed an idiot reference to .y where .x was intended in
+setCageCorners() which broke restriction to within the deployer's
+region.
+
+Deploying birds on long, skinny parcels (such as those for houseboats
+in Bellisseria) was prone to fail because the radius of the deployment
+candidate positions was based upon the half-diagonal of the cage
+boundaries determined from the parcel extents.  I rewrote the code in
+the hatchBird() function in Flocking Birds to compute the X and Y
+extents of the cage independently and then choose a random co-ordinate
+for each according to the specified probability distribution function.
+This should avoid all failures to place, but before pulling the
+detection and recovery code, I added a diagnostic to let me know if one
+should occur for some screwball reason I've failed to anticipate.
+
+2020 July 14
+
+Deleted the now-unused radius argument in hatchBird() in Flocking
+Birds.  It has been replaced by the pre-computed cageCorner vectors.
+
+Added an on_rez() handler which calls llResetScript in Flocking Birds.
+This ensures that all script variables are reset to their defaults when
+the user rezzes the deployer from inventory even if the developer
+failed to re-initiaiise the script before taking it into inventory for
+inclusion in the Marketplace.
+
+To better distinguish Attack and Defender Drones, Attack Drones retain
+their original battleship blue/grey colour but now fire slightly
+desaturated red beams, while Defenders are a shade of green and fire
+green beams.
+
+Cleaned up, added documentation, and deleted unused code in the Damage
+Bullet script.
+
+Modified the target seeking of Defender Drones to seek Attack Drones,
+not avatars.  Although they will not necessarily stay in the vicinity
+of avatars to protect them, their targeting of attackers wherever they
+are encountered makes them more formidable hunters.
+
+Ran a fifteen minute test on the long, skinny parcel of the houseboat
+with 40 instrumented flying anvils and auotmatic restriction of the
+cage after specifying a radius much larger than the parcel.  I ran this
+with the default behavioural settings and edges, and other than a few
+very small excursions in X and Y (which weren't close in magnitude to
+our safety margins), there wasn't a single attempt to fly off the
+parcel.  More testing is in order, but for the moment it looks like
+yesterday's changes have pretty much fixed the problem of wandering off
+small and slim parcels.
+
+2020 July 15
+
+Completely redesigned and rewrote how boredom works in the Curious
+script.  When we designate a new target, we clear bored and compute a
+time, timeStartBored, which is timeBored (default 15 seconds) plus a
+random interval from 0 to timeBoredRand (default 5 seconds).  If we are
+still designating the same target when timeStartBored arrives, we set
+bored, save the target with which we're bored in kBored, compute
+timeUnBored the same way we did timeStartBored, and revoke the target
+designation.  When timeUnBored rolls around [we check both in sensor()
+and no_sensor()], we clear bored and kBored and make the target
+eligible to be seen again.
+
+When bored is set, the code in sensor() which compiled the list of
+candidate target will ignore hits on kBored, precisely as we ignore
+hits on the owner when noOwner is set.  Note that it is possible to
+have the timer for timeUnBored for the previous target to be ticking
+simultaneously with timeStartBored for the current one.  A no_sensor()
+return checkes for timeUnBored but does not clear bored otherwise: it's
+valid to see nobody else while we're bored with a previous target.
+
+We update the target designation in the Bird script with LM_BI_TARGET
+whenever the position of the current target changes, not just the
+identity of the target.  This allows the target to track movement of an
+avatar and the birds to follow.
+
+If timeBored is set to zero, the boredom mechanism will be completely
+disabled.
+
+Made all of the prototype flying models Phantom.  They're set phantom
+after being rezzed, but this allows them not to obstruct motion when
+sitting aroung waiting to be taken into inventory.
+
+Added a "Aux curiousity boredom timeF [timeR]" command to set the fix and,
+optionally, random boredom times in seconds.  Setting timef to zero
+disables boredom.
+
+Added a touch_start() event to the Explosion object to permit
+fine-tuning of the particle system and sound effects for avatar hits
+without the need to embed two levels deep in objects and provoke the
+explosion.  This is conditional on TOUCH_EXPLOSION and will be disabled
+in production.
+
+Added a touch_start() event to the Flight Termination script in the
+Attack Drone to permit fine-tuning of the particle system and sound
+effects for avatar hits without the need to embed in the deployer and
+then create an explosion.  This is conditional on TOUCH_EXPLOSION and
+will be disabled in production.  Since the root prim is touch to sit,
+you have to use the menu to explicitly touch the object to trigger this
+effect.
+
+Using the touch mechanism to adjust particle system parameters for the
+Flight Termination script, made it less of an Earth-shattering kaboom
+that doesn't obscure everything that's going on the vicinity.  This
+will benefit from further fine tuning, but it's much improved from
+before.
+
+2020 July 16
+
+If somebody used the touch to test the Flight Termination effects
+feature, the particle system that makes the explosion would remain in
+existence in the object and, for some screwball reason, re-trigger
+itself under various circumstances such as being taken into inventory,
+rezzed from inventory, or deleted.  We'd encountered this before with
+the target, but I'd forgotten about this gotcha.  It would never happen
+in normal use since the object immediately deleted itself with llDie()
+after playing the particle system, but with the touch to test it was
+left around to surprise you.  I added code which explicitly deletes the
+particle system after a touch to test and, to be extra careful, also at
+on_rez() and state_entry() in the Flight Termination script.
+
+Integrated the "bored" logic from Curious Bird into the Attack Drone's
+Laser Cannon script.  It's a bit more complicated because of the
+distinction between Attack and Defender Drones.  Attack drones behave
+like Curious Birds and get bored with a target after a while, but
+Defender drones do not get bored: they continue to pursue an Attack
+target until it is destroyed or a closer target comes into range. I
+removed the previous code which made an attacker bored after shooting a
+target.  Since most combat configurations in Second Life are not one
+shot to kill, it makes more sense for at attacker to try for multiple
+hits while in the vicinity of a target.
+
+Added logic so the Flight Termination explosions for Attack and
+Defender Drones are different colours: orange and green, so you
+distinguish them more easily during intense battles.
+
+When Flight Termination processes a HIT message, it now immediately
+makes the bird invisible so it doesn't stay around in a zombie state
+until the particle system and sound clip explosion have a chance to
+complete.  Now, it disappears into the explosion the instant it's hit.
+
+2020 July 17
+
+Our attempt to change the size of the displayed beam when the range of
+the cannon changed failed due to another of Second Life's "silently
+ignored" gotchas.  A PRIM_SIZE change in llSetLinkPrimitiveParamsFast()
+does nothing if the prim is marked physical.  This can be worked around
+by first marking the root prim non-physical (since you can't mark a
+child link non-physical independently), then changing the size, then
+making the root physical once again.  This can all be done in a single
+API call by using the PRIM_LINK_TARGET trick to change which link
+subsequent command phrases apply to.  But turning the root prim
+physical off and on again causes it to forget its velocity, which
+results in the bird's being frozen in space until something happens
+which prompts it to start moving again.  To get around this, it's
+necessary to save and restore velocity across the change with
+llGetVel() and llSetVelocity().
+
+It was possible for ray cast from the Attack Drone to detect a sitter
+on the drone and shoot at it.  I added a test to ignore hits on an
+avatar on the sit target.  The beam can thus shoot through the legs of
+a seated avatar to hit other targets.
+
+Added logic to Laser Cannon to detect, when an avatar is hit, whether
+it's sitting on another object.  If so, it sends an EJECT on
+birdChannel to the object on which the avatar's sitting.  If this is
+another bird (any object running the Bird script, not just those with
+Laser Cannon, and even birds hatched by a different deployer), it will,
+upon recept of this message, verify that the avatar's key agrees with
+the one on its llAvatarOnSitTarget() and if so, boot the avatar off
+with llUnSit(). This is in addition to any push or damage inflicted by
+the hit from the attacking avatar.  Note that this required a change to
+the llListen() set-up to listen to any sender on birdChannel, not just
+the deployer, and a test in the listen() event to only accept deployer
+commands from the egg which deployed us.
+
+I had thought that for some reason the explosion sound clip that Flight
+Termination plays when a drone is shot down wasn't playing, but it
+simply turns out that the racket the drones make when they turn is so
+loud it masks the explosion.  If you turn down the volume on the turn
+clips, you can hear the explosions just fine.
+
+2020 July 19
+
+In order to cope with animesh models, which don't work if you try to
+link them to the UFO as child prims, I added the ability for a model to
+specify its principal axis (the one along which the prim moves when in
+forward motion) via a specification within its prim Description
+(PRIM_DESC) of:
+    ax=<x,y,z>
+where x, y, and z constitute a normalised vector and the specification
+is written exactly as above, with no spaces or changes in
+capitalisation. No specification is equivalent to "ax=<0,0,1>", which
+sets the Z axis as principal.
+
+To support this, I replaced the code in updateVelocity() that used
+llLookAt(), which assumes the Z axis is principal, with llRotLookAt(),
+allowing specification of an arbitrary principal axis. Since doing this
+would normally require a call on the dreaded llRotBetween(), which is
+famously flaky, I integrated the recommended replacement function as
+flRotBetween() which works correctly in all of the edge cases.  Models
+which use the UFO do not need to specify a principal axis, as the
+default value is correct for their orientation.
+
+Completed the initial implementation of an animesh bird model.  This
+is based upon the Marketplace listing:
+    Animpet Full Perm Animesh Animated Flying Bird Or Avatar: L$1,000
+    https://marketplace.secondlife.com/p/Animpet-Full-Perm-Animesh-Animated-Flying-Bird-Or-Avatar/19561865
+This is a 16 land impact animesh model which comes with two animations:
+one of constantly flapping wings and the second of alternating
+flapping and gliding and looking around.  The model is sold with
+full permissions and constraints on resale which it appears we can
+meet without too much difficulty.  The model comes with a script which
+only runs the supplied animations.
+
+My original idea was to make this a flying model in the usual way by
+linking it to the UFO with it as the child prim.  After a huge amount
+of wasted time and futile attempts to work around the problem, I
+concluded that this just doesn't work.  An animesh object appears to
+want to be the root prim and if don't conform to that, the animation
+simply won't work.  I finally admitted defeat and decided to include
+the Bird script in the animesh model prim.  This ran into the problem
+that the animesh prim was built with the X axis as its principal axis,
+while the Bird script assumed the Z axis, as that's what llLookAt()
+requires.  As described above, I replaced llLookAt() with
+llRotLookAt(), which allows specifying an arbitrary principal axis and
+added a mechanism where a model can declare its principal axis in its
+Description field.  This sufficed to get the animesh bird to fly in the
+correct direction without breaking the existing models.
+
+Next was making the animation do something more interesting than just
+constantly flapping like a duck.  I added a new script called Flight
+Animation which handles the animation.  When it starts, it sends a new
+link message to the Bird script, LM_BI_VELREQ, which requests the Bird
+script to notify it when updateVelocity() changes the velocity or turn
+angle of the bird.  This is done via a LM_BI_VELOCITY message which
+passes the velocity vector and turn angle.  We use an animation clip
+is a total of six seconds long and consists of around three seconds of
+flapping and three seconds of gliding.  (Although the bird model is
+full permission, the source files for the animations are not supplied
+or, as far as I can determine, available, so they cannot be modified
+and could only be re-created after guessing at the articulation of the
+animesh model, which is also not supplied or available.)
+
+When LM_BI_VELOCITY if received, if the bird is turning sharply (the
+same criterion is used as to trigger the chirp sound), the animation,
+if running, is stopped and restarted at the flapping phase at the
+start.  If the animation runs all the way to the end without a turn,
+it will stop near the end of the gliding phase, resulting in a static
+glide until the next turn.  Now, this is tacky, but it looks much better
+than it deserves to, especially since when you have a lot of birds
+flying at the same time few people look closely at their individual
+behaviour but concentrate, instead, on their collective dynamics.
+
+I added the Curiosity script to the Flying Animated Bird model to add
+that behaviour to its repertoire.  You can, of course, disable it if
+you prefer by clearing the 32 bit with Set action.
+
+2020 July 20
+
+Audited all of the scripts to ensure the copies in master objects agree
+with those in the source repository, lslint checked them all, corrected
+formatting to source code standards where necessary, and installed the
+latest master copy of the scripts into all flying models and updated in
+the deployer and Marketplace.
+
+When updateVelocity() in the Bird script was redesigned on 2020-07-19
+to replace llLookAt() with llRotLookAt(), the code failed to take into
+account a subtle difference between the two functions.  llLookAt(),
+which assumes the prim's principal axis of motion is the Z axis, also
+takes pains to ensure that the prim's local X axis remains below the
+horizon, which keeps flying objects "feet down" as they move.
+llRotLookAt() does no such thing, which resulted in, for example,
+flying corgis, which look silly enough in the first place, flying
+feet-up as often as feet-down. To fix this, I added code in
+updateVelocity() which computes the prim's local +X axis in region
+co-ordinates, and if its .z component is above the horizon (positive),
+rotates the object 180 degrees around its principal axis to keep it
+feet down.  This works regardless of whether the principal axis is the
+default <0,0,1> or a different axis specified by the "ax=" mechanism in
+the root prim's description.
+
+2020 July 21
+
+Deleted the Universal Flying Object documentation notecard from all of
+the models which use it except for the Universal Flying Object itself.
+It is unlikely in the extreme somebody using a model built using the
+UFO will need the basic information it provides.  Those building
+UFO-based models will find what they need to know in the generic model
+itself.
+
+Added the LICENSE notecards for the Blend Swap source mesh to the
+Content of the Anvil and Corgi models.  It was already present in the
+other mesh models.
+
+Created local development Git repository in:
+    ~/w/SecondLife/FlockingBirds/git
+with:
+    git init
+
+Logged on to github.com.
+
+Created a new repository:
+    flocking_birds
+with access URLs:
+    HTTPS: https://github.com/Fourmilab/flocking_birds.git
+    SSH:   git@github.com:Fourmilab/flocking_birds.git
+
+Linked the local repository to the GitHub archive:
+    git remote add origin git@github.com:Fourmilab/flocking_birds.git
+
+Committed the *.md files in the repository root and the
+marketplace/images files to which they link.
+
+Confirmed that my local "git sync" command works with the remote
+repository.
+
+The documents in the repository root now work properly.
+
+Made Marketplace listing alternative images for the alternative models
+included with the product.
+
+2020 July 23
+
+Added the ability for the Curiosity script to detect non-player
+characters (NPCs) such as those under development for the Fourmilab
+Folk project.  Models using the script will search for, in addition to
+avatars, objects which have a name of "[NPC]".  (The precise name
+allows a llSensor() query by name, which avoids detections of
+irrelevant objects such as other birds from saturating the maximum of
+16 detections by a sensor scan.  NPCs who use the name of "[NPC]" may
+specify their actual identification in the Description field.
+Detection of NPCs is controlled by the command:
+    Auxiliary curiosity NPCs on/off
+
+Added similar logic to the Laser Cannon script so that it can detect
+and attack NPCs.  The detection is the same as for Curiosity, with the
+addition of a test for NPCs in the ray cast which detects targets
+within the beam.  Detection of NPCs is controlled by the command:
+    Auxiliary cannon NPCs on/off
+
+2020 July 29
+
+Replaced the "TBD" in the Deployer script when the user enters an
+invalid Set command with a proper list of settable parameters.
+
+2020 July 30
+
+Version 1.0 released to the Marketplace.

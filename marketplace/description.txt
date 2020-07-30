@@ -1,0 +1,36 @@
+Fourmilab Flocking Birds is an artificial life simulation based upon the “Boids” algorithm developed by Craig Reynolds in 1986 (https://en.wikipedia.org/wiki/Boids).  The product provides an egg-shaped deployer which is controlled by commands in local chat.  It will randomly hatch (either confined to the two-dimensional X-Y plane or in three-dimensional space) a flock of individual birds which, independently fly, sense the position and motion of nearby birds, and obey five simple and identical rules:
+
+    1.  Turn away from the edges of the “cage” in which they are confined.
+    2.  Obey a limit on their maximum speed.
+    3.  Fly toward the centre of mass of nearby birds.
+    4.  Avoid collisions with nearby birds.
+    5.  Try to match the average velocity of nearby birds.
+
+All of the parameters which govern these rules, such as the visual range within which birds can sense one another and the strengths of the various behaviours can be set by commands in local chat, either before the birds are hatched or while the simulation is running.  Each of the rules can be independently enabled or disable to observe how they affect behaviour.  Other than distributing these settings, there is no central control: each bird is entirely autonomous and controlled by its own script and what it senses within its visual range.
+
+Despite this simplicity, a flock of these birds exhibits complex emergent behaviour which mimics that of real birds.  It demonstrates how complexity and order spontaneously emerge from simple rules without top-down control.  Other than the initial random assignment of bird position and velocity, the simulation is completely deterministic: there is no randomness in the behaviour of the birds, and yet the flock appears to be acting with free will and patterns never repeat.
+
+Land Impact and Permissions
+
+In order to run the Flocking Birds simulation, you must have land on which you can create objects and run scripts (this can be your own land, that of another who grants you object creation permission, or a public sandbox which allows scripted objects), and sufficient space that the birds you create do not fly off the property.  The deployer and each bird it creates have a land impact of 1: the property where you run the simulation must have sufficient object capacity remaining to accommodate the number of birds you create.  By default, birds delete themselves after fifteen minutes to avoid clutter: you can change this time or make them immortal by settings via local chat.  A “Remove” command will immediately delete all birds created by a deployer.
+
+Details
+
+Birds are physical objects, but are marked as “Phantom” so they do not interact with other objects.  Hence, they can fly through walls and other obstacles, which allows you to run the simulation in crowded spaces if you wish.
+
+Development Kit
+
+Fourmilab Flocking Birds is delivered including a development kit containing all of the object components, models, textures, scripts, sound clips, and documents used in the objects.  All items including scripts, have “full permissions” (copy, modify, and transfer), so that you can use them as the basis for your own development projects and/or share them with other users in Second Life.
+
+The development kit includes tools which allow users to add their own custom models (simple prims, linked prims, and mesh) and sound clips which will be animated by the simulation.
+
+Source code for this project is maintained on and available from the GitHub repository:
+    https://github.com/Fourmilab/flocking_birds
+
+License
+----------
+
+This product (software, documents, images, and original models) is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.
+    http://creativecommons.org/licenses/by-sa/4.0/
+    https://creativecommons.org/licenses/by-sa/4.0/legalcode
+You are free to copy and redistribute this material in any medium or format, and to remix, transform, and build upon the material for any purpose, including commercially.  You must give credit, provide a link to the license, and indicate if changes were made.  If you remix, transform, or build upon this material, you must distribute your contributions under the same license as the original.
